@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>LINE絵文字メーカー</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, sans-serif;
+      background: #f0f0f0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 16px;
+      user-select: none;
+    }
+
+    h1 {
+      font-size: 18px;
+      color: #06c755;
+      margin-bottom: 12px;
+      font-weight: bold;
+    }
+
+    /* キャンバス */
+    #canvasWrapper {
+      background: white;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+      touch-action: none;
+    }
+
+    canvas {
+      display: block;
+      width: 300px;
+      height: 300px;
+    }
+
+    /* ツールバー */
+    .toolbar {
+      background: white;
+      border-radius: 16px;
+      padding: 12px 16px;
+      margin-top: 12px;
+      width: 100%;
+      max-width: 340px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    .tool-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .tool-row:last-child { margin-bottom: 0; }
+
+    .tool-label {
+      font-size: 12px;
+      color: #888;
+      width: 40px;
+      flex-shrink: 0;
+    }
+
+    /* ツールボタン */
+    .tool-btn {
+      padding: 8px 14px;
+      border-radius: 20px;
+      border: 2px solid #ddd;
+      background: white;
+      font-size: 13px;
+      cursor: pointer;
+      color: #333;
+    }
+
+    .tool-btn.active {
+      border-color: #06c755;
+      background: #e8fdf0;
+      color: #06c755;
+      font-weight: bold;
+    }
+
+    /* 太さボタン */
+    .size-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 2px solid #ddd;
+      background: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .size-btn.active {
+      border-color: #06c755;
+      background: #e8fdf0;
+    }
+
+    .size-dot {
+      border-radius: 50%;
+      background: #333;
+    }
+
+    /* カラーピッカー */
+    #colorPicker {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 2px solid #ddd;
+      padding: 2px;
+      cursor: pointer;
+      background: none;
+    }
+
+    .color-preview {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 2px solid #ddd;
+    }
+
+    /* アクションボタン */
+    .action-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+      width: 100%;
+      max-width: 340px;
+    }
+
+    .action-btn {
+      flex: 1;
+      padding: 14px;
+      border-radius: 12px;
+      border: none;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .btn-clear {
+      background: #fff0f0;
+      color: #e74c3c;
+    }
+
+    .btn-undo {
+      background: #f0f4ff;
+      color: #2c5ff6;
+    }
+
+    .btn-save {
+      background: #06c755;
+      color: white;
+    }
+
+    .btn-clear:active, .btn-undo:active, .btn-save:active {
+      opacity: 0.8;
+    }
+
+    .info {
+      font-size: 11px;
+      color: #aaa;
+      margin-top: 10px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>LINE絵文字メーカー</h1>
+
+  <div id="canvasWrapper">
+    <canvas id="canvas" width="180" height="180"></canvas>
+  </div>
+
+  <div class="toolbar">
+
+    <!-- ツール選択 -->
+    <div class="tool-row">
+      <span class="tool-label">ツール</span>
+      <button class="tool-btn active" id="btnPen" onclick="setTool('pen')">ペン</button>
+      <button class="tool-btn" id="btnFill" onclick="setTool('fill')">塗り潰し</button>
+      <button class="tool-btn" id="btnEraser" onclick="setTool('eraser')">消しゴム</button>
+    </div>
+
+    <!-- ペンの太さ -->
+    <div class="tool-row">
+      <span class="tool-label">太さ</span>
+      <button class="size-btn active" id="sizeS" onclick="setSize('S')">
+        <div class="size-dot" style="width:4px;height:4px;"></div>
+      </button>
+      <button class="size-btn" id="sizeM" onclick="setSize('M')">
+        <div class="size-dot" style="width:8px;height:8px;"></div>
+      </button>
+      <button class="size-btn" id="sizeL" onclick="setSize('L')">
+        <div class="size-dot" style="width:14px;height:14px;"></div>
+      </button>
+    </div>
+
+    <!-- 色選択 -->
+    <div class="tool-row">
+      <span class="tool-label">色</span>
+      <input type="color" id="colorPicker" value="#000000" oninput="updateColor()">
+      <div class="color-preview" id="colorPreview" style="background:#000000;"></div>
+      <span style="font-size:12px;color:#888;margin-left:4px;" id="colorHex">#000000</span>
+    </div>
+
+  </div>
+
+  <div class="action-row">
+    <button class="action-btn btn-undo" onclick="undo()">元に戻す</button>
+    <button class="action-btn btn-clear" onclick="clearCanvas()">全消去</button>
+    <button class="action-btn btn-save" onclick="saveImage()">保存</button>
+  </div>
+
+  <p class="info">保存時に背景を透過してPNGで保存します</p>
+
+  <script>
+    const canvas  = document.getElementById('canvas');
+    const ctx     = canvas.getContext('2d');
+
+    // 初期設定
+    let tool      = 'pen';
+    let penSize   = 2;
+    let color     = '#000000';
+    let drawing   = false;
+    let lastX     = 0;
+    let lastY     = 0;
+    let history   = [];
+
+    // キャンバス初期化（白背景）
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, 180, 180);
+    saveHistory();
+
+    // ツール設定
+    function setTool(t) {
+      tool = t;
+      document.getElementById('btnPen').classList.toggle('active', t === 'pen');
+      document.getElementById('btnFill').classList.toggle('active', t === 'fill');
+      document.getElementById('btnEraser').classList.toggle('active', t === 'eraser');
+    }
+
+    // サイズ設定
+    function setSize(s) {
+      const sizes = { S: 2, M: 6, L: 14 };
+      penSize = sizes[s];
+      document.getElementById('sizeS').classList.toggle('active', s === 'S');
+      document.getElementById('sizeM').classList.toggle('active', s === 'M');
+      document.getElementById('sizeL').classList.toggle('active', s === 'L');
+    }
+
+    // 色更新
+    function updateColor() {
+      color = document.getElementById('colorPicker').value;
+      document.getElementById('colorPreview').style.background = color;
+      document.getElementById('colorHex').textContent = color;
+    }
+
+    // 座標取得
+    function getPos(e) {
+      const rect  = canvas.getBoundingClientRect();
+      const scaleX = 180 / rect.width;
+      const scaleY = 180 / rect.height;
+      const touch  = e.touches ? e.touches[0] : e;
+      return {
+        x: (touch.clientX - rect.left) * scaleX,
+        y: (touch.clientY - rect.top)  * scaleY,
+      };
+    }
+
+    // 描画開始
+    function startDraw(e) {
+      e.preventDefault();
+      const pos = getPos(e);
+
+      if (tool === 'fill') {
+        saveHistory();
+        floodFill(Math.round(pos.x), Math.round(pos.y), color);
+        return;
+      }
+
+      drawing = true;
+      lastX   = pos.x;
+      lastY   = pos.y;
+      saveHistory();
+
+      // 点を打つ
+      ctx.beginPath();
+      ctx.arc(lastX, lastY, (tool === 'eraser' ? penSize * 2 : penSize) / 2, 0, Math.PI * 2);
+      ctx.fillStyle = tool === 'eraser' ? '#ffffff' : color;
+      ctx.fill();
+    }
+
+    // 描画中
+    function moveDraw(e) {
+      e.preventDefault();
+      if (!drawing) return;
+      const pos = getPos(e);
+
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.strokeStyle = tool === 'eraser' ? '#ffffff' : color;
+      ctx.lineWidth   = tool === 'eraser' ? penSize * 2 : penSize;
+      ctx.lineCap     = 'round';
+      ctx.lineJoin    = 'round';
+      ctx.stroke();
+
+      lastX = pos.x;
+      lastY = pos.y;
+    }
+
+    // 描画終了
+    function endDraw(e) {
+      e.preventDefault();
+      drawing = false;
+    }
+
+    // タッチイベント
+    canvas.addEventListener('touchstart',  startDraw, { passive: false });
+    canvas.addEventListener('touchmove',   moveDraw,  { passive: false });
+    canvas.addEventListener('touchend',    endDraw,   { passive: false });
+    canvas.addEventListener('mousedown',   startDraw);
+    canvas.addEventListener('mousemove',   moveDraw);
+    canvas.addEventListener('mouseup',     endDraw);
+
+    // 塗り潰し（フラッドフィル）
+    function floodFill(startX, startY, fillColor) {
+      const imageData = ctx.getImageData(0, 0, 180, 180);
+      const data      = imageData.data;
+
+      const idx       = (startY * 180 + startX) * 4;
+      const targetR   = data[idx];
+      const targetG   = data[idx + 1];
+      const targetB   = data[idx + 2];
+      const targetA   = data[idx + 3];
+
+      const fillR = parseInt(fillColor.slice(1, 3), 16);
+      const fillG = parseInt(fillColor.slice(3, 5), 16);
+      const fillB = parseInt(fillColor.slice(5, 7), 16);
+
+      if (targetR === fillR && targetG === fillG && targetB === fillB) return;
+
+      const stack = [[startX, startY]];
+      while (stack.length) {
+        const [x, y] = stack.pop();
+        if (x < 0 || x >= 180 || y < 0 || y >= 180) continue;
+        const i = (y * 180 + x) * 4;
+        if (
+          data[i]     !== targetR ||
+          data[i + 1] !== targetG ||
+          data[i + 2] !== targetB ||
+          data[i + 3] !== targetA
+        ) continue;
+
+        data[i]     = fillR;
+        data[i + 1] = fillG;
+        data[i + 2] = fillB;
+        data[i + 3] = 255;
+
+        stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
+      }
+      ctx.putImageData(imageData, 0, 0);
+    }
+
+    // 履歴保存
+    function saveHistory() {
+      if (history.length > 30) history.shift();
+      history.push(ctx.getImageData(0, 0, 180, 180));
+    }
+
+    // 元に戻す
+    function undo() {
+      if (history.length <= 1) return;
+      history.pop();
+      ctx.putImageData(history[history.length - 1], 0, 0);
+    }
+
+    // 全消去
+    function clearCanvas() {
+      if (!confirm('全て消去しますか？')) return;
+      saveHistory();
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, 180, 180);
+    }
+
+    // 保存（背景透過）
+    function saveImage() {
+      // 背景透過用の新しいキャンバス
+      const tmpCanvas = document.createElement('canvas');
+      tmpCanvas.width  = 180;
+      tmpCanvas.height = 180;
+      const tmpCtx = tmpCanvas.getContext('2d');
+
+      // 元画像を取得
+      const imageData = ctx.getImageData(0, 0, 180, 180);
+      const data      = imageData.data;
+      const newData   = tmpCtx.createImageData(180, 180);
+
+      // 白を透明に変換
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+
+        // 白に近いピクセルを透明に
+        if (r > 240 && g > 240 && b > 240) {
+          newData.data[i]     = 255;
+          newData.data[i + 1] = 255;
+          newData.data[i + 2] = 255;
+          newData.data[i + 3] = 0; // 透明
+        } else {
+          newData.data[i]     = r;
+          newData.data[i + 1] = g;
+          newData.data[i + 2] = b;
+          newData.data[i + 3] = data[i + 3];
+        }
+      }
+
+      tmpCtx.putImageData(newData, 0, 0);
+
+      // PNG保存
+      const link    = document.createElement('a');
+      link.download = 'line-emoji.png';
+      link.href     = tmpCanvas.toDataURL('image/png');
+      link.click();
+    }
+  </script>
+</body>
+</html>
